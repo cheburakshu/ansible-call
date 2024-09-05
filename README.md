@@ -8,7 +8,7 @@
 You can install `ansible-call` from PyPI using pip:
 
 ```bash
-pip install ansible-call
+pip install ansiblecall
 ```
 
 ## Example
