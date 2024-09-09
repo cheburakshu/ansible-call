@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -28,12 +28,16 @@ dependencies = [
 
 
 [project.urls]
-Documentation = "https://github.com/cheburakshu/ansiblecall#readme"
-Issues = "https://github.com/cheburakshu/ansiblecall/issues"
-Source = "https://github.com/cheburakshu/ansiblecall"
+Documentation = "https://github.com/cheburakshu/ansible-call#readme"
+Issues = "https://github.com/cheburakshu/ansible-call/issues"
+Source = "https://github.com/cheburakshu/ansible-call"
 
 [tool.hatch.version]
-path = "src/ansiblecall/__about__.py"
+# path = "src/ansiblecall/__about__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
 
 [tool.hatch.envs.test]
 dependencies = [
