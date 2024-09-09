@@ -92,8 +92,8 @@ class Context(ContextDecorator):
 
     @staticmethod
     def returner(rc):
-        if rc:
-            raise AnsbileError(rc)
+        # if rc:
+        #     raise AnsbileError(rc)
         return rc
 
     def __init__(self, module_name, module_path, params=None) -> None:
@@ -136,6 +136,8 @@ class Context(ContextDecorator):
         """
         ret = None
         try:
+            if val:
+                val = val.strip().split("\n")[-1]
             ret = json.loads((val or "{}").strip())
             if "invocation" in ret:
                 ret.pop("invocation")
