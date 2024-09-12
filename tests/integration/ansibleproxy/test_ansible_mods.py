@@ -21,3 +21,16 @@ def test_module_refresh():
     Ensure modules are refreshed
     """
     assert ansiblecall.refresh_modules()
+
+
+def test_respawn():
+    """
+    Ensure ansible modules like apt which use respawn works
+    """
+    assert ansiblecall.module(mod_name="ansible.builtin.ping") == {"ping": "pong"}
+    # Install hello package
+    ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="absent")
+    ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
+    assert ret["changed"] is True
+    ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
+    assert ret["changed"] is False
