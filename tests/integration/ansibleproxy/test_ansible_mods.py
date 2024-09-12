@@ -1,4 +1,20 @@
+import os
+
+import pytest
+
 import ansiblecall
+
+
+def not_debian():
+    if os.path.exists("/etc/os-release"):
+        with open("/etc/os-release") as f:
+            os_release_info = f.read().lower()
+            if "debian" in os_release_info or "ubuntu" in os_release_info or "mint" in os_release_info:
+                return False
+    return True
+
+
+NOT_DEBIAN = not_debian()
 
 
 def test_ansiblecall_module():
@@ -23,6 +39,7 @@ def test_module_refresh():
     assert ansiblecall.refresh_modules()
 
 
+@pytest.mark.skipif(NOT_DEBIAN, reason="Not debian distro")
 def test_respawn():
     """
     Ensure ansible modules like apt which use respawn works

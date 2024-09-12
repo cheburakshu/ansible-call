@@ -17,7 +17,6 @@ from ansible.module_utils import basic
 log = logging.getLogger(__name__)
 
 
-@functools.lru_cache
 def get_temp_file():
     with tempfile.NamedTemporaryFile(delete=False) as f:
         return f.name
@@ -91,28 +90,35 @@ class Context(ContextDecorator):
 
     def __init__(self, module_name, module_path, params=None) -> None:
         super().__init__()
-        self.__stdout = sys.stdout
-        self.__argv = sys.argv
-        self.__path = sys.path
-        self.__ret = StringIO()
+        self.__stdout = None
+        self.__argv = None
+        self.__path = None
+        self.__ret = None
+
+        # Store context inputs
         self.params = params or {}
         self.module_name = module_name
         self.module_path = module_path
-        self.respawn_out_fname = get_temp_file()
 
     @staticmethod
-    def respawn_module(func, fname):
+    def respawn_module(func):
         def wrapped(*args, **kwargs):
+            fname = get_temp_file()
             try:
+                __subprocess_call = subprocess.call
                 with open(fname, "w") as fp:
-                    __subprocess_call = subprocess.call
                     subprocess.call = functools.partial(subprocess.call, stdout=fp)
                     func(*args, **kwargs)
             except OSError:
                 log.exception("Error in respawning module")
                 raise
-            finally:
+            except SystemExit:
+                with open(fname) as fp:
+                    sys.stdout.flush()
+                    sys.stdout.write(fp.read())
+                os.unlink(fname)
                 subprocess.call = __subprocess_call
+                raise
 
         return wrapped
 
@@ -120,6 +126,11 @@ class Context(ContextDecorator):
         """
         Patch necessary methods to run an Ansible module
         """
+        self.__ret = StringIO()
+        self.__stdout = sys.stdout
+        self.__argv = sys.argv
+        self.__path = sys.path
+
         # Patch ANSIBLE_ARGS. All Ansible modules read their parameters from
         # this variable.
         basic._ANSIBLE_ARGS = json.dumps(  # noqa: SLF001
@@ -128,8 +139,7 @@ class Context(ContextDecorator):
 
         # Patch respawn module
         ansible.module_utils.common.respawn.respawn_module = self.respawn_module(
-            func=ansible.module_utils.common.respawn.respawn_module,
-            fname=self.respawn_out_fname,
+            func=ansible.module_utils.common.respawn.respawn_module
         )
 
         # Patch sys module. Ansible modules will use sys.exit(x) to return
@@ -165,17 +175,10 @@ class Context(ContextDecorator):
         """
         ret = None
         try:
-            if os.path.exists(self.respawn_out_fname):
-                with open(self.respawn_out_fname) as fp:
-                    self.__ret.flush()
-                    self.__ret.write(fp.read())
             ret = self.clean_return(self.__ret.getvalue())
         except OSError:
             log.exception("Error in respawning module")
             raise
-        finally:
-            if os.path.exists(self.respawn_out_fname):
-                os.unlink(self.respawn_out_fname)
         return ret
 
     def __exit__(self, *exc):
@@ -187,3 +190,4 @@ class Context(ContextDecorator):
         sys.path = self.__path
         delattr(sys.modules["__main__"], "_module_fqn")
         delattr(sys.modules["__main__"], "_modlib_path")
+        self.__ret = None

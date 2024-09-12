@@ -45,7 +45,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.test.scripts]
-all = "pytest -vv tests/"
+all = "pytest -vv --log-cli-level=DEBUG tests/"
 
 [[tool.hatch.envs.test.matrix]]
 python = ["3.12"]
