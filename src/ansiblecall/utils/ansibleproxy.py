@@ -162,7 +162,6 @@ class Context(ContextDecorator):
         """
         ret = None
         try:
-            sys.stderr.write(str(val) + "\n")
             if val:
                 val = val.strip().split("\n")[-1]
             ret = json.loads((val or "{}").strip())

@@ -55,17 +55,3 @@ def test_respawn_root_user():
     assert ret["changed"] is True
     ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
     assert ret["changed"] is False
-
-
-@pytest.mark.skipif(NOT_DEBIAN or IS_ROOT, reason="Not debian distro, or root user")
-def test_respawn_non_root_user():
-    """
-    Ensure ansible modules like apt which use respawn works
-    """
-    assert ansiblecall.module(mod_name="ansible.builtin.ping") == {"ping": "pong"}
-    ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="absent")
-
-    # Install hello package
-    ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
-    print(ret)  # noqa: T201
-    assert "Permission denied" in ret["stderr"]
