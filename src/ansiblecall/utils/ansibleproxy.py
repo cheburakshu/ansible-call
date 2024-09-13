@@ -106,7 +106,7 @@ class Context(ContextDecorator):
             fname = get_temp_file()
             try:
                 __subprocess_call = subprocess.call
-                log.debug("Respawning with file %s", fname)
+                log.debug("Respawning with output redirected to file %s", fname)
                 with open(fname, "w") as fp:
                     subprocess.call = functools.partial(subprocess.call, stdout=fp)
                     func(*args, **kwargs)
@@ -117,7 +117,6 @@ class Context(ContextDecorator):
                 log.debug("Reading output from file %s", fname)
                 with open(fname) as fp:
                     out = fp.read()
-                    sys.stderr.write(out)
                     sys.stdout.flush()
                     sys.stdout.write(out)
                 os.unlink(fname)
