@@ -67,4 +67,5 @@ def test_respawn_non_root_user():
 
     # Install hello package
     ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
+    print(ret)  # noqa: T201
     assert "Permission denied" in ret["stderr"]
