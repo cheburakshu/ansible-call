@@ -3,15 +3,23 @@ import glob
 import json
 import logging
 import os
+import subprocess
 import sys
+import tempfile
 from contextlib import ContextDecorator
 from io import StringIO
 
 import ansible
+import ansible.module_utils.common.respawn
 import ansible.modules
 from ansible.module_utils import basic
 
 log = logging.getLogger(__name__)
+
+
+def get_temp_file():
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        return f.name
 
 
 def load_module(module_key, module_name, module_path):
@@ -75,42 +83,56 @@ def load_ansible_mods():
     return ret
 
 
-class AnsbileError(Exception):
-    """
-    Base AnsibleError class, just captures the return code for now.
-    """
-
-    def __init__(self, rc, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.rc = rc
-
-
 class Context(ContextDecorator):
     """
     Run ansible module with certain sys methods overridden
     """
 
-    @staticmethod
-    def returner(rc):
-        # if rc:
-        #     raise AnsbileError(rc)
-        return rc
-
     def __init__(self, module_name, module_path, params=None) -> None:
         super().__init__()
-        self.__stdout = sys.stdout
-        self.__argv = sys.argv
-        self.__exit = sys.exit
-        self.__path = sys.path
-        self.__ret = StringIO()
+        self.__stdout = None
+        self.__argv = None
+        self.__path = None
+        self.__ret = None
+
+        # Store context inputs
         self.params = params or {}
         self.module_name = module_name
         self.module_path = module_path
+
+    @staticmethod
+    def respawn_module(func):
+        def wrapped(*args, **kwargs):
+            fname = get_temp_file()
+            try:
+                __subprocess_call = subprocess.call
+                log.debug("Respawning with output redirected to file %s", fname)
+                with open(fname, "w") as fp:
+                    subprocess.call = functools.partial(subprocess.call, stdout=fp)
+                    func(*args, **kwargs)
+            except OSError:
+                log.exception("Error in respawning module")
+                raise
+            except SystemExit:
+                log.debug("Reading output from file %s", fname)
+                with open(fname) as fp:
+                    out = fp.read()
+                    sys.stdout.flush()
+                    sys.stdout.write(out)
+                os.unlink(fname)
+                subprocess.call = __subprocess_call
+                raise
+
+        return wrapped
 
     def __enter__(self):
         """
         Patch necessary methods to run an Ansible module
         """
+        self.__ret = StringIO()
+        self.__stdout = sys.stdout
+        self.__argv = sys.argv
+        self.__path = sys.path
 
         # Patch ANSIBLE_ARGS. All Ansible modules read their parameters from
         # this variable.
@@ -118,10 +140,14 @@ class Context(ContextDecorator):
             {"ANSIBLE_MODULE_ARGS": self.params or {}}
         ).encode("utf-8")
 
+        # Patch respawn module
+        ansible.module_utils.common.respawn.respawn_module = self.respawn_module(
+            func=ansible.module_utils.common.respawn.respawn_module
+        )
+
         # Patch sys module. Ansible modules will use sys.exit(x) to return
         sys.argv = []
         sys.stdout = self.__ret
-        sys.exit = self.returner
         if self.module_path not in sys.path:
             sys.path.insert(0, self.module_path)
         sys.modules["__main__"]._module_fqn = self.module_name  # noqa: SLF001
@@ -150,7 +176,13 @@ class Context(ContextDecorator):
         """
         Grab return from stdout
         """
-        return self.clean_return(self.__ret.getvalue())
+        ret = None
+        try:
+            ret = self.clean_return(self.__ret.getvalue())
+        except OSError:
+            log.exception("Error in respawning module")
+            raise
+        return ret
 
     def __exit__(self, *exc):
         """
@@ -158,7 +190,7 @@ class Context(ContextDecorator):
         """
         sys.argv = self.__argv
         sys.stdout = self.__stdout
-        sys.exit = self.__exit
         sys.path = self.__path
         delattr(sys.modules["__main__"], "_module_fqn")
         delattr(sys.modules["__main__"], "_modlib_path")
+        self.__ret = None
