@@ -117,9 +117,8 @@ class Context(ContextDecorator):
                 log.debug("Reading output from file %s", fname)
                 with open(fname) as fp:
                     out = fp.read()
-                    if out:
-                        sys.stdout.flush()
-                        sys.stdout.write(out)
+                    sys.stdout.flush()
+                    sys.stdout.write(out)
                 os.unlink(fname)
                 subprocess.call = __subprocess_call
                 raise
@@ -163,6 +162,7 @@ class Context(ContextDecorator):
         """
         ret = None
         try:
+            sys.stderr.write(str(val) + "\n")
             if val:
                 val = val.strip().split("\n")[-1]
             ret = json.loads((val or "{}").strip())
