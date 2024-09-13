@@ -117,8 +117,9 @@ class Context(ContextDecorator):
                 log.debug("Reading output from file %s", fname)
                 with open(fname) as fp:
                     out = fp.read()
-                    sys.stdout.flush()
-                    sys.stdout.write(out)
+                    if out:
+                        sys.stdout.flush()
+                        sys.stdout.write(out)
                 os.unlink(fname)
                 subprocess.call = __subprocess_call
                 raise
