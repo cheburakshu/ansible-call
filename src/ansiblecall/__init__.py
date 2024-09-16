@@ -1,5 +1,6 @@
 import importlib
 import logging
+import time
 
 import ansiblecall.utils.ansibleproxy
 
@@ -12,8 +13,10 @@ logging.basicConfig(
 
 def module(mod_name, **params):
     """Run ansible module."""
+    start = time.time()
     log.debug("Running module [%s] with params [%s]", mod_name, " ,".join(list(params)))
     modules = ansiblecall.utils.ansibleproxy.load_ansible_mods()
+    log.debug("Loaded ansible modules. Elapsed: %0.03fs", (time.time() - start))
     mod = modules[mod_name]
     with ansiblecall.utils.ansibleproxy.Context(
         module_path=mod.path,
@@ -24,7 +27,10 @@ def module(mod_name, **params):
         try:
             mod.main()
         except SystemExit:
-            log.debug("Returning data to caller.")
+            log.debug(
+                "Returning data to caller. Total elapsed: %0.03fs",
+                (time.time() - start),
+            )
             return ctx.ret
 
 
