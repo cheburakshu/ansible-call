@@ -11,9 +11,7 @@ logging.basicConfig(
 
 
 def module(mod_name, **params):
-    """
-    Run ansible module.
-    """
+    """Run ansible module."""
     log.debug("Running module [%s] with params [%s]", mod_name, " ,".join(list(params)))
     modules = ansiblecall.utils.ansibleproxy.load_ansible_mods()
     mod = modules[mod_name]
@@ -31,9 +29,7 @@ def module(mod_name, **params):
 
 
 def refresh_modules():
-    """
-    Refresh Ansible module cache
-    """
+    """Refresh Ansible module cache"""
     fun = ansiblecall.utils.ansibleproxy.load_ansible_mods
     fun.cache_clear()
     return fun()

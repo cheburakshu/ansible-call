@@ -20,9 +20,7 @@ NOT_DEBIAN = not_debian()
 
 
 def test_ansiblecall_module():
-    """
-    Ensure ansible module can be called as an ansiblecall module
-    """
+    """Ensure ansible module can be called as an ansiblecall module"""
     assert ansiblecall.module(mod_name="ansible.builtin.ping", data="hello") == {"ping": "hello"}
     assert ansiblecall.module(mod_name="ansible.builtin.ping") == {"ping": "pong"}
     ret = ansiblecall.module(mod_name="ansible.builtin.file", path="/tmp/foo", state="absent")
@@ -37,17 +35,13 @@ def test_ansiblecall_module():
 
 
 def test_module_refresh():
-    """
-    Ensure modules are refreshed
-    """
+    """Ensure modules are refreshed"""
     assert ansiblecall.refresh_modules()
 
 
 @pytest.mark.skipif(NOT_DEBIAN or not IS_ROOT, reason="Not debian distro, or non-root user")
 def test_respawn_root_user():
-    """
-    Ensure ansible modules like apt which use respawn works
-    """
+    """Ensure ansible modules like apt which use respawn works"""
     assert ansiblecall.module(mod_name="ansible.builtin.ping") == {"ping": "pong"}
     # Install hello package
     ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="absent")
