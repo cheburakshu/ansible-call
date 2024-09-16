@@ -45,8 +45,6 @@ def load_ansible_mods():
             if f.startswith("_") or not f.endswith(".py"):
                 continue
             fname = f.removesuffix(".py")
-            # Ansible modules will be referred in salt as 2 parts ansible_builtin.ping instead of
-            # ansible.builtin.ping.
             mod = f"ansible.builtin.{fname}"
             module_name = f"{ansible.modules.__name__}.{fname}"
             module_path = os.path.dirname(os.path.dirname(ansible.__file__))
@@ -122,8 +120,9 @@ class Context(ContextDecorator):
                     sys.stdout.flush()
                     sys.stdout.write(out)
                 os.unlink(fname)
-                subprocess.call = __subprocess_call
                 raise
+            finally:
+                subprocess.call = __subprocess_call
 
         return wrapped
 
@@ -148,10 +147,10 @@ class Context(ContextDecorator):
         # Patch sys module. Ansible modules will use sys.exit(x) to return
         sys.argv = []
         sys.stdout = self.__ret
-        if self.module_path not in sys.path:
-            sys.path.insert(0, self.module_path)
         sys.modules["__main__"]._module_fqn = self.module_name  # noqa: SLF001
         sys.modules["__main__"]._modlib_path = self.module_path  # noqa: SLF001
+        if self.module_path not in sys.path:
+            sys.path.insert(0, self.module_path)
         return self
 
     @staticmethod
@@ -173,19 +172,13 @@ class Context(ContextDecorator):
     @property
     def ret(self):
         """Grab return from stdout"""
-        ret = None
-        try:
-            ret = self.clean_return(self.__ret.getvalue())
-        except OSError:
-            log.exception("Error in respawning module")
-            raise
-        return ret
+        return self.clean_return(self.__ret.getvalue())
 
     def __exit__(self, *exc):
         """Restore all patched objects"""
         sys.argv = self.__argv
         sys.stdout = self.__stdout
         sys.path = self.__path
+        self.__ret = None
         delattr(sys.modules["__main__"], "_module_fqn")
         delattr(sys.modules["__main__"], "_modlib_path")
-        self.__ret = None
