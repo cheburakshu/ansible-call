@@ -22,7 +22,7 @@ def get_temp_file():
         return f.name
 
 
-def load_module(module_key, module_name, module_path):
+def load_module(module_key, module_name, module_path, module_abs):
     # Avoid circular import
     import ansiblecall
 
@@ -30,15 +30,14 @@ def load_module(module_key, module_name, module_path):
     proxy_mod = functools.partial(ansiblecall.module, name=module_key)
     proxy_mod.path = module_path
     proxy_mod.name = module_name
+    proxy_mod.abs = module_abs
     ret[module_key] = proxy_mod
     return ret
 
 
 @functools.lru_cache
 def load_ansible_mods():
-    """
-    Load ansible modules
-    """
+    """Load ansible modules"""
     ret = {}
     # Load ansible core modules
     for path in ansible.modules.__path__:
@@ -56,7 +55,8 @@ def load_ansible_mods():
                     module_key=mod,
                     module_name=module_name,
                     module_path=module_path,
-                )
+                    module_abs=os.path.join(*ansible.modules.__path__, f),
+                ),
             )
 
     # Load collections when available
@@ -70,23 +70,25 @@ def load_ansible_mods():
             relname = os.path.relpath(f.removesuffix(".py"), collections_root)
             name_parts = relname.split("/")
             namespace, coll_name, module = name_parts[1], name_parts[2], name_parts[-1]
+            if module.startswith("_"):
+                continue
             mod = f"{namespace}.{coll_name}.{module}"
             module_name = relname.replace("/", ".")
             module_path = collections_root
+            module_abs = f
             ret.update(
                 load_module(
                     module_key=mod,
                     module_name=module_name,
                     module_path=module_path,
-                )
+                    module_abs=module_abs,
+                ),
             )
     return ret
 
 
 class Context(ContextDecorator):
-    """
-    Run ansible module with certain sys methods overridden
-    """
+    """Run ansible module with certain sys methods overridden"""
 
     def __init__(self, module_name, module_path, params=None) -> None:
         super().__init__()
@@ -126,9 +128,7 @@ class Context(ContextDecorator):
         return wrapped
 
     def __enter__(self):
-        """
-        Patch necessary methods to run an Ansible module
-        """
+        """Patch necessary methods to run an Ansible module"""
         self.__ret = StringIO()
         self.__stdout = sys.stdout
         self.__argv = sys.argv
@@ -137,12 +137,12 @@ class Context(ContextDecorator):
         # Patch ANSIBLE_ARGS. All Ansible modules read their parameters from
         # this variable.
         basic._ANSIBLE_ARGS = json.dumps(  # noqa: SLF001
-            {"ANSIBLE_MODULE_ARGS": self.params or {}}
+            {"ANSIBLE_MODULE_ARGS": self.params or {}},
         ).encode("utf-8")
 
         # Patch respawn module
         ansible.module_utils.common.respawn.respawn_module = self.respawn_module(
-            func=ansible.module_utils.common.respawn.respawn_module
+            func=ansible.module_utils.common.respawn.respawn_module,
         )
 
         # Patch sys module. Ansible modules will use sys.exit(x) to return
@@ -156,8 +156,7 @@ class Context(ContextDecorator):
 
     @staticmethod
     def clean_return(val):
-        """
-        All ansible modules print the return json to stdout.
+        """All ansible modules print the return json to stdout.
         Read the return json in stdout from our StringIO object.
         """
         ret = None
@@ -173,9 +172,7 @@ class Context(ContextDecorator):
 
     @property
     def ret(self):
-        """
-        Grab return from stdout
-        """
+        """Grab return from stdout"""
         ret = None
         try:
             ret = self.clean_return(self.__ret.getvalue())
@@ -185,9 +182,7 @@ class Context(ContextDecorator):
         return ret
 
     def __exit__(self, *exc):
-        """
-        Restore all patched objects
-        """
+        """Restore all patched objects"""
         sys.argv = self.__argv
         sys.stdout = self.__stdout
         sys.path = self.__path
