@@ -16,7 +16,11 @@ def module(mod_name, **params):
     start = time.time()
     log.debug("Running module [%s] with params [%s]", mod_name, " ,".join(list(params)))
     modules = ansiblecall.utils.ansibleproxy.load_ansible_mods()
-    log.debug("Loaded ansible modules. Elapsed: %0.03fs", (time.time() - start))
+    log.debug(
+        "Loaded %s ansible modules. Elapsed: %0.03fs",
+        len(modules),
+        (time.time() - start),
+    )
     mod = modules[mod_name]
     with ansiblecall.utils.ansibleproxy.Context(
         module_path=mod.path,
