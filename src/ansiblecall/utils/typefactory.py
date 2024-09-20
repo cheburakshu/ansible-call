@@ -113,11 +113,11 @@ class TypeFactory:
     def render_template(self):
         return f"""import dataclasses
 import ansiblecall
-import ansiblecall.utils.typed
+import ansiblecall.utils.typefactory
 
 
 @dataclasses.dataclass(kw_only=True)
-class {self.output_class_name}(ansiblecall.utils.typed.OutputBase):
+class {self.output_class_name}(ansiblecall.utils.typefactory.OutputBase):
 {self.output_class_body}
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)

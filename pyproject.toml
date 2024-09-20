@@ -50,13 +50,17 @@ all = "pytest -vv --log-cli-level=DEBUG tests/"
 [[tool.hatch.envs.test.matrix]]
 python = ["3.12"]
 
+[tool.hatch.envs.dev]
+template = "test"
+extra-dependencies = [
+  "ipykernel",
+]
+
 [tool.coverage.run]
 source_pkgs = ["ansiblecall", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/ansiblecall/__about__.py",
-]
+omit = []
 
 [tool.coverage.paths]
 ansiblecall = ["src/ansiblecall", "*/ansiblecall/src/ansiblecall"]
