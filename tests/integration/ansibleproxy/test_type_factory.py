@@ -1,9 +1,9 @@
-from ansiblecall.utils import typed
+from ansiblecall.utils import typefactory
 
 
 def test_type_factory():
     """Ensure ansible module can be called using typings"""
-    typed.TypeFactory.run(
+    typefactory.TypeFactory.run(
         modules=[
             "ansible.builtin.ping",
             "community.general.archive",

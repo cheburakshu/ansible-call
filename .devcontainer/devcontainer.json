@@ -18,12 +18,15 @@
     // Use 'postCreateCommand' to run commands after the container is created.
     // "postCreateCommand": "uname -a",
 
+    "postAttachCommand": "hatch shell dev",
+
     // Configure tool-specific properties.
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-python.python",
-                "charliermarsh.ruff"
+                "charliermarsh.ruff",
+                "ms-toolsai.jupyter"
             ]
         }
     }
