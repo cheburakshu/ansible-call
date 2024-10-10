@@ -1,18 +1,19 @@
 import functools
 import glob
+import importlib
 import json
 import logging
 import os
-import subprocess
 import sys
 import tempfile
 from contextlib import ContextDecorator
 from io import StringIO
 
 import ansible
-import ansible.module_utils.common.respawn
 import ansible.modules
 from ansible.module_utils import basic
+
+from ansiblecall.utils.respawn import respawn_module
 
 log = logging.getLogger(__name__)
 
@@ -100,31 +101,12 @@ class Context(ContextDecorator):
         self.module_name = module_name
         self.module_path = module_path
 
-    @staticmethod
-    def respawn_module(func):
-        def wrapped(*args, **kwargs):
-            fname = get_temp_file()
-            try:
-                __subprocess_call = subprocess.call
-                log.debug("Respawning with output redirected to file %s", fname)
-                with open(fname, "w") as fp:
-                    subprocess.call = functools.partial(subprocess.call, stdout=fp)
-                    func(*args, **kwargs)
-            except OSError:
-                log.exception("Error in respawning module")
-                raise
-            except SystemExit:
-                log.debug("Reading output from file %s", fname)
-                with open(fname) as fp:
-                    out = fp.read()
-                    sys.stdout.flush()
-                    sys.stdout.write(out)
-                os.unlink(fname)
-                raise
-            finally:
-                subprocess.call = __subprocess_call
-
-        return wrapped
+    def run(self):
+        mod = importlib.import_module(self.module_name)
+        try:
+            mod.main()
+        except SystemExit:
+            return self.ret
 
     def __enter__(self):
         """Patch necessary methods to run an Ansible module"""
@@ -140,9 +122,7 @@ class Context(ContextDecorator):
         ).encode("utf-8")
 
         # Patch respawn module
-        ansible.module_utils.common.respawn.respawn_module = self.respawn_module(
-            func=ansible.module_utils.common.respawn.respawn_module,
-        )
+        ansible.module_utils.common.respawn.respawn_module = respawn_module
 
         # Patch sys module. Ansible modules will use sys.exit(x) to return
         sys.argv = []
