@@ -27,7 +27,8 @@
                 "ms-python.python",
                 "charliermarsh.ruff",
                 "ms-toolsai.jupyter"
-            ]
+            ],
+            "terminal.integrated.defaultProfile.linux": "bash"
         }
     }
 

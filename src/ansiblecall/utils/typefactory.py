@@ -43,14 +43,22 @@ class Field:
 
     def format_default(self):
         ret = None
-        if self.type is bool and isinstance(self.default, str) and self.default is not None:
+        if (
+            self.type is bool
+            and isinstance(self.default, str)
+            and self.default is not None
+        ):
             if self.default.lower() in ["yes", "true"]:
                 ret = True
             elif self.default.lower() in ["no", "false"]:
                 ret = False
         elif self.type is str and self.default is not None:
             ret = f"{self.default!r}"
-        elif self.type is dict and isinstance(self.default, str) and self.default is not None:
+        elif (
+            self.type is dict
+            and isinstance(self.default, str)
+            and self.default is not None
+        ):
             ret = json.loads(self.default)
         elif (self.type is float or self.type is int) and self.default is not None:
             ret = self.type(self.default)
@@ -58,7 +66,11 @@ class Field:
 
     def __repr__(self):
         default = f"= {self.format_default()}" if self.optional else ""
-        description = " ".join(self.description) if isinstance(self.description, list) else self.description
+        description = (
+            " ".join(self.description)
+            if isinstance(self.description, list)
+            else self.description
+        )
         choices = (self.choices and "Choices: " + str(self.choices)) or ""
         return f'{self.name}: {self.type.__name__} {default}\n"""{description} {choices}"""'
 
@@ -107,7 +119,9 @@ class TypeFactory:
         self.input_class_body = self.generate_class_body(fields=schema["input"])
         self.module_file_name = f"{self.module_name.replace('.', '_')}.py"
         code = self.render_template()
-        with open(pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w") as fp:
+        with open(
+            pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w"
+        ) as fp:
             fp.write(code)
 
     def render_template(self):
@@ -147,13 +161,9 @@ class {self.input_class_name}:
         """
         Run type generation using multiprocessing lib
         """
-        procs = []
-        for _ in range(multiprocessing.cpu_count()):
-            p = multiprocessing.Process(name=cls.__name__, target=cls.generate_parallel, args=(queue,))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        num_procs = multiprocessing.cpu_count()
+        with multiprocessing.Pool(num_procs) as p:
+            p.map(cls.generate_parallel, [queue] * num_procs)
 
     @staticmethod
     def get_var_value(mod_str: str, var: str) -> str:
@@ -164,7 +174,9 @@ class {self.input_class_name}:
             (
                 n.value.value
                 for n in ast.walk(ast.parse(mod_str))
-                if isinstance(n, ast.Assign) and hasattr(n.targets[0], "id") and n.targets[0].id == var
+                if isinstance(n, ast.Assign)
+                and hasattr(n.targets[0], "id")
+                and n.targets[0].id == var
             ),
             None,
         )
@@ -242,7 +254,9 @@ class {self.input_class_name}:
 
     @staticmethod
     def init_dirs(clean=None):
-        init_file = pathlib.Path(__file__).parent.parent.joinpath("typed", "__init__.py")
+        init_file = pathlib.Path(__file__).parent.parent.joinpath(
+            "typed", "__init__.py"
+        )
         init_dir = init_file.parent
         if clean:
             log.info("Removing dir %s.", init_dir)
@@ -267,18 +281,20 @@ class {self.input_class_name}:
         """
         Install typings for ansible modules
         """
-        queue = multiprocessing.Queue()
         mods = ansiblecall.refresh_modules()
         type_mods = (modules and list(set(modules) & set(mods))) or list(mods)
         clean = not modules
         log.info("Initializing dirs.")
         type_dir = cls.init_dirs(clean=clean)
         log.info("Generating types for %s module(s).", len(type_mods))
-        for module_name in type_mods:
-            factory = cls(
-                type_dir=type_dir,
-                module_name=module_name,
-            )
-            queue.put(factory, block=False)
-        cls.process(queue=queue)
-        log.info("Done!")
+        multiprocessing.set_start_method("spawn")
+        with multiprocessing.Manager() as m:
+            queue = m.Queue()
+            for module_name in type_mods:
+                factory = cls(
+                    type_dir=type_dir,
+                    module_name=module_name,
+                )
+                queue.put(factory, block=False)
+            cls.process(queue=queue)
+            log.info("Done!")

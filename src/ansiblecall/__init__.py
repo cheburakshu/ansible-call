@@ -1,4 +1,3 @@
-import importlib
 import logging
 import time
 
@@ -27,15 +26,7 @@ def module(mod_name, **params):
         module_name=mod.name,
         params=params,
     ) as ctx:
-        mod = importlib.import_module(ctx.module_name)
-        try:
-            mod.main()
-        except SystemExit:
-            log.debug(
-                "Returning data to caller. Total elapsed: %0.03fs",
-                (time.time() - start),
-            )
-            return ctx.ret
+        return ctx.run()
 
 
 def refresh_modules():
