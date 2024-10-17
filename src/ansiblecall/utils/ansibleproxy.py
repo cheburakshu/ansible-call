@@ -89,7 +89,7 @@ def load_ansible_mods():
 class Context(ContextDecorator):
     """Run ansible module with certain sys methods overridden"""
 
-    def __init__(self, module_name, module_path, params=None) -> None:
+    def __init__(self, module_name, module_path, params=None, runtime=None) -> None:
         super().__init__()
         self.__stdout = None
         self.__argv = None
@@ -100,11 +100,15 @@ class Context(ContextDecorator):
         self.params = params or {}
         self.module_name = module_name
         self.module_path = module_path
+        self.runtime = runtime
 
     def run(self):
-        mod = importlib.import_module(self.module_name)
         try:
-            mod.main()
+            if self.runtime:
+                ansible.module_utils.common.respawn.respawn_module(runtime=self.runtime)
+            else:
+                mod = importlib.import_module(self.module_name)
+                mod.main()
         except SystemExit:
             return self.ret
 

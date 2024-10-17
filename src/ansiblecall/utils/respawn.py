@@ -1,14 +1,26 @@
+import json
 import logging
-import os
 import subprocess
 import sys
 
-from ansible.module_utils.common.respawn import _create_payload, has_respawned, to_bytes
+from ansible.module_utils.common.respawn import _create_payload, has_respawned
 
 log = logging.getLogger(__name__)
 
 
-def respawn_module(interpreter_path):
+def build_cmd(interpreter_path=None, runtime=None):
+    cmd = []
+    log.debug("type: %s, data: %s", type(runtime), runtime)
+    if runtime:
+        if runtime.become:
+            cmd.append("sudo")
+        if runtime.become_user:
+            cmd.extend(["su", runtime.become_user, "-c"])
+    cmd.extend([interpreter_path or "python3", "--"])
+    return cmd
+
+
+def respawn_module(interpreter_path=None, runtime=None):
     """
     Respawn the currently-running Ansible Python module under the specified Python interpreter.
 
@@ -30,20 +42,21 @@ def respawn_module(interpreter_path):
 
     # FUTURE: we need a safe way to log that a respawn has occurred for forensic/debug purposes
     payload = _create_payload()
-    stdin_read, stdin_write = os.pipe()
-    os.write(stdin_write, to_bytes(payload))
-    os.close(stdin_write)
 
     # Changes start
+    cmd = build_cmd(interpreter_path=interpreter_path, runtime=runtime)
     ret = subprocess.run(
-        [interpreter_path, "--"],
-        stdin=stdin_read,
+        cmd,
+        input=payload,
         text=True,
         capture_output=True,
         check=False,
     )
+    out = ret.stdout
+    if ret.returncode:
+        out = json.dumps({"changed": False, "failed": True, "msg": str(ret.stderr.strip())})
     sys.stdout.flush()
-    sys.stdout.write(ret.stdout)
+    sys.stdout.write(out)
     # Changes end
 
     sys.exit(0)
