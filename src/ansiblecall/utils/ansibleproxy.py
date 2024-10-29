@@ -61,19 +61,11 @@ def load_ansible_mods():
     # Load collections when available
     # Refer: https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#installing-collections-with-ansible-galaxy
     roots = sys.path
-    roots.append(
-        os.path.expanduser(
-            os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")
-        )
-    )
+    roots.append(os.path.expanduser(os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")))
     for collections_root in roots:
         # The glob will produce result like below
         # ['/root/.ansible/collections/ansible_collections/amazon/aws/plugins/modules/cloudtrail_info.py', ...]
-        for f in glob.glob(
-            os.path.join(
-                collections_root, "ansible_collections/*/*/plugins/modules/*.py"
-            )
-        ):
+        for f in glob.glob(os.path.join(collections_root, "ansible_collections/*/*/plugins/modules/*.py")):
             relname = os.path.relpath(f.removesuffix(".py"), collections_root)
             name_parts = relname.split("/")
             namespace, coll_name, module = name_parts[1], name_parts[2], name_parts[-1]
