@@ -16,8 +16,8 @@ log = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(kw_only=True)
-class InputBase(ansiblecall.Runtime):
-    pass
+class InputBase:
+    rt: ansiblecall.Runtime = None
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -264,13 +264,14 @@ class {self.input_class_name}(ansiblecall.utils.typefactory.InputBase):
                     log.info("%s modules remaining.", queue_size)
 
     @classmethod
-    def run(cls, modules=None):
+    def run(cls, modules=None, clean=None):
         """
         Install typings for ansible modules
         """
         mods = ansiblecall.refresh_modules()
         type_mods = (modules and list(set(modules) & set(mods))) or list(mods)
-        clean = not modules
+        if clean is None and not modules:
+            clean = True
         log.info("Initializing dirs.")
         type_dir = cls.init_dirs(clean=clean)
         log.info("Generating types for %s module(s).", len(type_mods))

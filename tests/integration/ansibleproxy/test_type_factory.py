@@ -1,3 +1,6 @@
+import pathlib
+import tempfile
+
 from ansiblecall.utils import typefactory
 
 
@@ -8,7 +11,8 @@ def test_type_factory():
             "ansible.builtin.ping",
             "community.general.archive",
             "ansible.builtin.file",
-        ]
+        ],
+        clean=True,
     )
     import ansiblecall.typed.ansible_builtin_file as file
     import ansiblecall.typed.ansible_builtin_ping as ping
@@ -22,11 +26,14 @@ def test_type_factory():
     p.data = "ping"
     assert p.run().ping == "ping"
 
-    ret = file.File(path="/tmp/foo", state="absent").run()
-    ret = file.File(path="/tmp/foo", state="touch").run()
-    assert ret.changed is True
-    ret = file.File(path="/tmp/foo.gz", state="absent").run()
-    ret = archive.Archive(path="/tmp/foo").run()
-    assert ret.changed is True
-    ret = archive.Archive(path="/tmp/foo").run()
-    assert ret.changed is False
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        foo_file = str(pathlib.Path(tmp_dir).joinpath("foo"))
+        foo_archive = str(pathlib.Path(tmp_dir).joinpath("foo.gz"))
+        ret = file.File(path=foo_file, state="absent").run()
+        ret = file.File(path=foo_file, state="touch").run()
+        assert ret.changed is True
+        ret = file.File(path=foo_archive, state="absent").run()
+        ret = archive.Archive(path=foo_file).run()
+        assert ret.changed is True
+        ret = archive.Archive(path=foo_file).run()
+        assert ret.changed is False

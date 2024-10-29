@@ -61,11 +61,19 @@ def load_ansible_mods():
     # Load collections when available
     # Refer: https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#installing-collections-with-ansible-galaxy
     roots = sys.path
-    roots.append(os.path.expanduser(os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")))
+    roots.append(
+        os.path.expanduser(
+            os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")
+        )
+    )
     for collections_root in roots:
         # The glob will produce result like below
         # ['/root/.ansible/collections/ansible_collections/amazon/aws/plugins/modules/cloudtrail_info.py', ...]
-        for f in glob.glob(os.path.join(collections_root, "ansible_collections/*/*/plugins/modules/*.py")):
+        for f in glob.glob(
+            os.path.join(
+                collections_root, "ansible_collections/*/*/plugins/modules/*.py"
+            )
+        ):
             relname = os.path.relpath(f.removesuffix(".py"), collections_root)
             name_parts = relname.split("/")
             namespace, coll_name, module = name_parts[1], name_parts[2], name_parts[-1]
@@ -89,7 +97,7 @@ def load_ansible_mods():
 class Context(ContextDecorator):
     """Run ansible module with certain sys methods overridden"""
 
-    def __init__(self, module_name, module_path, params=None, runtime=None) -> None:
+    def __init__(self, module, params=None, runtime=None) -> None:
         super().__init__()
         self.__stdout = None
         self.__argv = None
@@ -98,8 +106,7 @@ class Context(ContextDecorator):
 
         # Store context inputs
         self.params = params or {}
-        self.module_name = module_name
-        self.module_path = module_path
+        self.module = module
         self.runtime = runtime
 
     def run(self):
@@ -107,7 +114,7 @@ class Context(ContextDecorator):
             if self.runtime:
                 ansible.module_utils.common.respawn.respawn_module(runtime=self.runtime)
             else:
-                mod = importlib.import_module(self.module_name)
+                mod = importlib.import_module(self.module.name)
                 mod.main()
         except SystemExit:
             return self.ret
@@ -131,10 +138,11 @@ class Context(ContextDecorator):
         # Patch sys module. Ansible modules will use sys.exit(x) to return
         sys.argv = []
         sys.stdout = self.__ret
-        sys.modules["__main__"]._module_fqn = self.module_name  # noqa: SLF001
-        sys.modules["__main__"]._modlib_path = self.module_path  # noqa: SLF001
-        if self.module_path not in sys.path:
-            sys.path.insert(0, self.module_path)
+        sys.modules["__main__"]._module_fqn = self.module.name  # noqa: SLF001
+        sys.modules["__main__"]._modlib_path = self.module.path  # noqa: SLF001
+        sys.modules["__main__"]._module_abs = self.module.abs  # noqa: SLF001
+        if self.module.path not in sys.path:
+            sys.path.insert(0, self.module.path)
         return self
 
     @staticmethod
@@ -166,3 +174,4 @@ class Context(ContextDecorator):
         self.__ret = None
         delattr(sys.modules["__main__"], "_module_fqn")
         delattr(sys.modules["__main__"], "_modlib_path")
+        delattr(sys.modules["__main__"], "_module_abs")
