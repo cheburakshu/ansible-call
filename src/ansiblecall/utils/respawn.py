@@ -151,8 +151,11 @@ def respawn_module(interpreter_path=None, runtime=None):
         check=False,
     )
     out = ret.stdout
+    log.error("Stdout = %s, Stderr = %s", ret.stdout, ret.stderr)
     if ret.returncode:
-        out = json.dumps({"changed": False, "failed": True, "msg": str(ret.stderr.strip())})
+        out = json.dumps(
+            {"changed": False, "failed": True, "msg": str(ret.stderr.strip())}
+        )
     sys.stdout.flush()
     sys.stdout.write(out)
     # Changes end
