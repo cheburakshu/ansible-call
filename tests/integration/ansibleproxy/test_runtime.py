@@ -1,7 +1,10 @@
+import logging
 import pathlib
 import tempfile
 
 import ansiblecall
+
+log = logging.getLogger(__name__)
 
 
 def test_escalate_privilege():
@@ -21,6 +24,7 @@ def test_escalate_privilege():
 
     # Delete the user
     ret = ansiblecall.module("ansible.builtin.user", rt=rt_root, name=user, state="absent")
+    log.error(ret)
     assert ret["state"] == "absent"
 
     # Touch a file as root
