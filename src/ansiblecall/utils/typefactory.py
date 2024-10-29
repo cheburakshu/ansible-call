@@ -16,6 +16,11 @@ log = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(kw_only=True)
+class InputBase:
+    rt: ansiblecall.Runtime = None
+
+
+@dataclasses.dataclass(kw_only=True)
 class OutputBase:
     failed: bool = None
     msg: str = None
@@ -43,22 +48,14 @@ class Field:
 
     def format_default(self):
         ret = None
-        if (
-            self.type is bool
-            and isinstance(self.default, str)
-            and self.default is not None
-        ):
+        if self.type is bool and isinstance(self.default, str) and self.default is not None:
             if self.default.lower() in ["yes", "true"]:
                 ret = True
             elif self.default.lower() in ["no", "false"]:
                 ret = False
         elif self.type is str and self.default is not None:
             ret = f"{self.default!r}"
-        elif (
-            self.type is dict
-            and isinstance(self.default, str)
-            and self.default is not None
-        ):
+        elif self.type is dict and isinstance(self.default, str) and self.default is not None:
             ret = json.loads(self.default)
         elif (self.type is float or self.type is int) and self.default is not None:
             ret = self.type(self.default)
@@ -66,11 +63,7 @@ class Field:
 
     def __repr__(self):
         default = f"= {self.format_default()}" if self.optional else ""
-        description = (
-            " ".join(self.description)
-            if isinstance(self.description, list)
-            else self.description
-        )
+        description = " ".join(self.description) if isinstance(self.description, list) else self.description
         choices = (self.choices and "Choices: " + str(self.choices)) or ""
         return f'{self.name}: {self.type.__name__} {default}\n"""{description} {choices}"""'
 
@@ -119,9 +112,7 @@ class TypeFactory:
         self.input_class_body = self.generate_class_body(fields=schema["input"])
         self.module_file_name = f"{self.module_name.replace('.', '_')}.py"
         code = self.render_template()
-        with open(
-            pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w"
-        ) as fp:
+        with open(pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w") as fp:
             fp.write(code)
 
     def render_template(self):
@@ -137,7 +128,7 @@ class {self.output_class_name}(ansiblecall.utils.typefactory.OutputBase):
         self.__dict__.update(kwargs)
 
 @dataclasses.dataclass(kw_only=True)
-class {self.input_class_name}:
+class {self.input_class_name}(ansiblecall.utils.typefactory.InputBase):
 {self.input_class_body}
     # Method to filter out unset values or values left at their default
     def get_params(self) -> dict:
@@ -174,9 +165,7 @@ class {self.input_class_name}:
             (
                 n.value.value
                 for n in ast.walk(ast.parse(mod_str))
-                if isinstance(n, ast.Assign)
-                and hasattr(n.targets[0], "id")
-                and n.targets[0].id == var
+                if isinstance(n, ast.Assign) and hasattr(n.targets[0], "id") and n.targets[0].id == var
             ),
             None,
         )
@@ -254,11 +243,9 @@ class {self.input_class_name}:
 
     @staticmethod
     def init_dirs(clean=None):
-        init_file = pathlib.Path(__file__).parent.parent.joinpath(
-            "typed", "__init__.py"
-        )
+        init_file = pathlib.Path(__file__).parent.parent.joinpath("typed", "__init__.py")
         init_dir = init_file.parent
-        if clean:
+        if clean and init_dir.exists():
             log.info("Removing dir %s.", init_dir)
             shutil.rmtree(init_dir)
         init_dir.mkdir(parents=True, exist_ok=True)
@@ -277,13 +264,14 @@ class {self.input_class_name}:
                     log.info("%s modules remaining.", queue_size)
 
     @classmethod
-    def run(cls, modules=None):
+    def run(cls, modules=None, clean=None):
         """
         Install typings for ansible modules
         """
         mods = ansiblecall.refresh_modules()
         type_mods = (modules and list(set(modules) & set(mods))) or list(mods)
-        clean = not modules
+        if clean is None and not modules:
+            clean = True
         log.info("Initializing dirs.")
         type_dir = cls.init_dirs(clean=clean)
         log.info("Generating types for %s module(s).", len(type_mods))
