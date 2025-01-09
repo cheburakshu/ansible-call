@@ -31,4 +31,5 @@ print(result)
 Contributions are welcome! If you'd like to contribute to ansible-call, please fork the repository and submit a pull request with your changes. Make sure to follow the project's coding standards and include tests for any new features.
 
 ## License
+
 `ansible-call` is licensed under the GNU GPLv3 License. See the LICENSE file for more details.
