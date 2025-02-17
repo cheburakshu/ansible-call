@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Hatch
-        uses: pypa/hatch@install
+        run: pipx install hatch
 
       - name: Build the package
         run: hatch build
