@@ -1,17 +1,13 @@
 import json
 import logging
 import os
-import pathlib
-import shutil
 import subprocess
 import sys
 import tempfile
 
-import ansible
-import ansible._vendor
-import ansible.module_utils
-import ansible.release
 from ansible.module_utils.common.respawn import _create_payload, has_respawned
+
+from ansiblecall.utils.cache import package_ansible_libs
 
 log = logging.getLogger(__name__)
 
@@ -27,91 +23,11 @@ def build_cmd(interpreter_path=None, runtime=None):
     return cmd
 
 
-def package_ansible_libs(path):
-    """
-    Package ansible module and util libraries at a given path
-    """
-    roots = {
-        "ref": {
-            "site_packages": pathlib.Path(ansible.__file__).parent.parent,
-            "collections_root": pathlib.Path(sys.modules["__main__"]._modlib_path),  # noqa: SLF001
-            "collections_plugins": pathlib.Path(
-                sys.modules["__main__"]._module_abs  # noqa: SLF001
-            ).parent.parent,
-        },
-        "builtins": [
-            {
-                "src": pathlib.Path(ansible.__file__),
-                "relative_to": "site_packages",
-                "copytree": False,
-            },
-            {
-                "src": pathlib.Path(ansible.module_utils.__file__).parent,
-                "relative_to": "site_packages",
-                "copytree": True,
-            },
-            {
-                "src": pathlib.Path(ansible._vendor.__file__).parent,  # noqa: SLF001
-                "relative_to": "site_packages",
-                "copytree": True,
-            },
-            {
-                "src": pathlib.Path(ansible.release.__file__),
-                "relative_to": "site_packages",
-                "copytree": False,
-            },
-            {
-                "src": pathlib.Path(sys.modules["__main__"]._module_abs),  # noqa: SLF001
-                "relative_to": "site_packages",
-                "copytree": False,
-            },
-        ],
-        "collections": [
-            {
-                "src": pathlib.Path(sys.modules["__main__"]._module_abs),  # noqa: SLF001
-                "relative_to": "collections_root",
-                "copytree": False,
-            },
-            {
-                "src": "collections_plugins",
-                "joinpath": "module_utils",
-                "relative_to": "collections_root",
-                "copytree": True,
-            },
-            {
-                "src": "collections_plugins",
-                "joinpath": "plugin_utils",
-                "relative_to": "collections_root",
-                "copytree": True,
-            },
-        ],
-    }
-    module_fqdn = sys.modules["__main__"]._module_fqn  # noqa: SLF001
-    ref, sources = roots["ref"], roots["builtins"]
-    if not module_fqdn.startswith("ansible.modules."):
-        sources += roots["collections"]
-    for s in sources:
-        src = ref[s["src"]] if isinstance(s["src"], str) else s["src"]
-        joinpath = s.get("joinpath")
-        if joinpath:
-            src = src.joinpath(joinpath)
-        dst = pathlib.Path(path).joinpath(src.relative_to(ref[s["relative_to"]]))
-        copytree = s["copytree"]
-        dirs = dst if copytree else dst.parent
-        if not src.exists():
-            continue
-        os.makedirs(dirs, exist_ok=True)
-        if copytree:
-            shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
-        else:
-            shutil.copy(src=src, dst=dst)
-
-
 def own_namespace(fun):
     def wrapped(*args, **kwargs):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
             package_ansible_libs(path=tmp_dir)
-            os.chmod(tmp_dir, 0o777)  # noqa: S103
+            os.chmod(tmp_dir, 0o555)  # noqa: S103
             sys.modules["__main__"]._modlib_path = tmp_dir  # noqa: SLF001
             return fun(*args, **kwargs)
 
