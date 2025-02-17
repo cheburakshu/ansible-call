@@ -23,17 +23,22 @@ class Runtime(dict):
         self[key] = value
 
 
-def module(mod_name, *, rt: Runtime = None, **params):
-    """Run ansible module."""
+def get_module(mod_name):
     start = time.time()
-    log.debug("Running module [%s] with params [%s]", mod_name, ", ".join(list(params)))
     modules = ansiblecall.utils.ansibleproxy.load_ansible_mods()
     log.debug(
         "Loaded %s ansible modules. Elapsed: %0.03fs",
         len(modules),
         (time.time() - start),
     )
-    mod = modules[mod_name]
+    return modules[mod_name]
+
+
+def module(mod_name, *, rt: Runtime = None, **params):
+    """Run ansible module."""
+    start = time.time()
+    log.debug("Running module [%s] with params [%s]", mod_name, ", ".join(list(params)))
+    mod = get_module(mod_name=mod_name)
     with ansiblecall.utils.ansibleproxy.Context(module=mod, params=params, runtime=rt) as ctx:
         ret = ctx.run()
         log.debug(
@@ -49,3 +54,10 @@ def refresh_modules():
     fun = ansiblecall.utils.ansibleproxy.load_ansible_mods
     fun.cache_clear()
     return fun()
+
+
+def cache(mod_name):
+    """Cache ansible modules and dependencies into a zip file"""
+    mod = get_module(mod_name=mod_name)
+    with ansiblecall.utils.ansibleproxy.Context(module=mod) as ctx:
+        return ctx.cache()

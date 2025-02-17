@@ -1,5 +1,7 @@
+import hashlib
 import os
 import pathlib
+import shutil
 import tempfile
 
 import pytest
@@ -55,3 +57,12 @@ def test_respawn_root_user():
     assert ret["changed"] is True
     ret = ansiblecall.module(mod_name="ansible.builtin.apt", name="hello", state="present")
     assert ret["changed"] is False
+
+
+def test_cache():
+    """Check if cache can be created and verify the sum"""
+    shutil.rmtree(os.path.expanduser("~/.ansiblecall"))
+    hash_sum = ansiblecall.cache(mod_name="ansible.builtin.file")
+    with open(os.path.expanduser("~/.ansiblecall/cache/ansible.modules.file.zip"), "rb") as fp:
+        expected = hashlib.sha256(fp.read()).hexdigest()
+    assert hash_sum == expected

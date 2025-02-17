@@ -13,6 +13,7 @@ import ansible
 import ansible.modules
 from ansible.module_utils import basic
 
+from ansiblecall.utils.cache import cache
 from ansiblecall.utils.respawn import respawn_module
 
 log = logging.getLogger(__name__)
@@ -100,6 +101,9 @@ class Context(ContextDecorator):
         self.params = params or {}
         self.module = module
         self.runtime = runtime
+
+    def cache(self):
+        return cache(mod_name=self.module.name)
 
     def run(self):
         try:
