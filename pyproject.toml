@@ -32,6 +32,9 @@ Documentation = "https://github.com/cheburakshu/ansible-call#readme"
 Issues = "https://github.com/cheburakshu/ansible-call/issues"
 Source = "https://github.com/cheburakshu/ansible-call"
 
+[tool.setuptools]
+license-files = []
+
 [tool.hatch.version]
 # path = "src/ansiblecall/__about__.py"
 source = "vcs"
