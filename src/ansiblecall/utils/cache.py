@@ -6,23 +6,26 @@ import shutil
 import sys
 import tempfile
 
-import ansible
-import ansible._vendor
-import ansible.module_utils
-import ansible.release
+import ansiblecall.utils.config
+import ansiblecall.utils.loader
 
-CACHE_DIR = os.path.expanduser("~/.ansiblecall/cache")
+CACHE_DIR = ansiblecall.utils.config.get_config(key="cache_dir")
 if not os.path.exists(CACHE_DIR):
     os.makedirs(CACHE_DIR, exist_ok=True)
 
 log = logging.getLogger(__name__)
 
 
-def package_ansible_libs(path):
+def package_libs(path):
     """
     Package ansible module and util libraries at a given path
     """
-    # Avoid circular import
+    # Lazy import
+    import ansible
+    import ansible._vendor
+    import ansible.module_utils
+    import ansible.release
+
     import ansiblecall
 
     roots = {
@@ -115,14 +118,43 @@ def package_ansible_libs(path):
             shutil.copy(src=src, dst=dst)
 
 
+def compare_checksum(filename: str):
+    zip_name = str(filename).removesuffix(".zip")
+    checksum = ""
+    checksum_file = zip_name + ".sha256"
+    if os.path.exists(checksum_file):
+        with open(checksum_file) as hfp:
+            checksum = hfp.read()
+    zip_checksum = get_checksum(filename=filename)
+    return checksum == zip_checksum
+
+
+def get_checksum(filename: str):
+    zip_name = str(filename).removesuffix(".zip")
+    with open(zip_name + ".zip", "rb") as fp:
+        return hashlib.sha256(fp.read()).hexdigest()
+
+
+def save_checksum(filename: str):
+    checksum = get_checksum(filename=filename)
+    zip_name = str(filename).removesuffix(".zip")
+    with open(zip_name + ".sha256", "w") as hfp:
+        hfp.write(checksum)
+    return checksum
+
+
 def cache(mod_name):
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-        package_ansible_libs(path=tmp_dir)
-        zip_name = os.path.join(CACHE_DIR, mod_name)
-        shutil.make_archive(zip_name, format="zip", root_dir=tmp_dir)
-        with open(zip_name + ".zip", "rb") as fp:
-            hash_sum = hashlib.sha256(fp.read()).hexdigest()
-            with open(zip_name + ".sha256", "w") as hfp:
-                hfp.write(hash_sum)
+        package_libs(path=tmp_dir)
+        archive_name = os.path.join(CACHE_DIR, mod_name)
+        shutil.make_archive(archive_name, format="zip", root_dir=tmp_dir)
+        checksum = save_checksum(filename=archive_name)
         log.debug("Cached %s module.", mod_name)
-        return hash_sum
+        return checksum
+
+
+def refresh_modules():
+    """Refresh Ansible module cache"""
+    fun = ansiblecall.utils.loader.load_mods
+    fun.cache_clear()
+    return fun()

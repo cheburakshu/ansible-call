@@ -7,7 +7,7 @@ import tempfile
 
 from ansible.module_utils.common.respawn import _create_payload, has_respawned
 
-from ansiblecall.utils.cache import package_ansible_libs
+from ansiblecall.utils.cache import package_libs
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def build_cmd(interpreter_path=None, runtime=None):
 def own_namespace(fun):
     def wrapped(*args, **kwargs):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-            package_ansible_libs(path=tmp_dir)
+            package_libs(path=tmp_dir)
             os.chmod(tmp_dir, 0o555)  # noqa: S103
             sys.modules["__main__"]._modlib_path = tmp_dir  # noqa: SLF001
             return fun(*args, **kwargs)
