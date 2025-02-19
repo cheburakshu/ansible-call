@@ -1,11 +1,9 @@
-import functools
-import glob
 import importlib
 import json
-import logging
-import os
+import pathlib
+import shutil
 import sys
-import tempfile
+import zipfile
 from contextlib import ContextDecorator
 from io import StringIO
 
@@ -13,78 +11,10 @@ import ansible
 import ansible.modules
 from ansible.module_utils import basic
 
-from ansiblecall.utils.cache import cache
+import ansiblecall.utils.cache
+import ansiblecall.utils.loader
+from ansiblecall.utils.config import get_config
 from ansiblecall.utils.respawn import respawn_module
-
-log = logging.getLogger(__name__)
-
-
-def get_temp_file():
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        return f.name
-
-
-def load_module(module_key, module_name, module_path, module_abs):
-    # Avoid circular import
-    import ansiblecall
-
-    ret = {}
-    proxy_mod = functools.partial(ansiblecall.module, name=module_key)
-    proxy_mod.path = module_path
-    proxy_mod.name = module_name
-    proxy_mod.abs = module_abs
-    ret[module_key] = proxy_mod
-    return ret
-
-
-@functools.lru_cache
-def load_ansible_mods():
-    """Load ansible modules"""
-    ret = {}
-    # Load ansible core modules
-    for path in ansible.modules.__path__:
-        for f in os.listdir(path):
-            if f.startswith("_") or not f.endswith(".py"):
-                continue
-            fname = f.removesuffix(".py")
-            mod = f"ansible.builtin.{fname}"
-            module_name = f"{ansible.modules.__name__}.{fname}"
-            module_path = os.path.dirname(os.path.dirname(ansible.__file__))
-            ret.update(
-                load_module(
-                    module_key=mod,
-                    module_name=module_name,
-                    module_path=module_path,
-                    module_abs=os.path.join(*ansible.modules.__path__, f),
-                ),
-            )
-
-    # Load collections when available
-    # Refer: https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#installing-collections-with-ansible-galaxy
-    roots = sys.path
-    roots.append(os.path.expanduser(os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")))
-    for collections_root in roots:
-        # The glob will produce result like below
-        # ['/root/.ansible/collections/ansible_collections/amazon/aws/plugins/modules/cloudtrail_info.py', ...]
-        for f in glob.glob(os.path.join(collections_root, "ansible_collections/*/*/plugins/modules/*.py")):
-            relname = os.path.relpath(f.removesuffix(".py"), collections_root)
-            name_parts = relname.split("/")
-            namespace, coll_name, module = name_parts[1], name_parts[2], name_parts[-1]
-            if module.startswith("_"):
-                continue
-            mod = f"{namespace}.{coll_name}.{module}"
-            module_name = relname.replace("/", ".")
-            module_path = collections_root
-            module_abs = f
-            ret.update(
-                load_module(
-                    module_key=mod,
-                    module_name=module_name,
-                    module_path=module_path,
-                    module_abs=module_abs,
-                ),
-            )
-    return ret
 
 
 class Context(ContextDecorator):
@@ -92,6 +22,7 @@ class Context(ContextDecorator):
 
     def __init__(self, module, params=None, runtime=None) -> None:
         super().__init__()
+
         self.__stdout = None
         self.__argv = None
         self.__path = None
@@ -103,7 +34,7 @@ class Context(ContextDecorator):
         self.runtime = runtime
 
     def cache(self):
-        return cache(mod_name=self.module.name)
+        return ansiblecall.utils.cache.cache(mod_name=self.module.key)
 
     def run(self):
         try:
@@ -171,3 +102,37 @@ class Context(ContextDecorator):
         delattr(sys.modules["__main__"], "_module_fqn")
         delattr(sys.modules["__main__"], "_modlib_path")
         delattr(sys.modules["__main__"], "_module_abs")
+
+
+class ZipContext(ContextDecorator):
+    def __init__(self, mod_name):
+        super().__init__()
+        self.mod_name = mod_name
+
+    def reload(self):
+        import ansible
+
+        zip_filename = pathlib.Path(ansible.__file__).parent.parent
+        if not zipfile.is_zipfile(zip_filename):
+            return
+        target_dir = pathlib.Path(get_config(key="cache_dir")).joinpath(self.mod_name)
+        if (
+            ansiblecall.utils.cache.compare_checksum(filename=zip_filename) is False
+            or target_dir.exists() is False
+        ):
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(file=zip_filename) as zp:
+                zp.extractall(path=target_dir)
+        sys.path.insert(0, str(target_dir))
+        ansiblecall.utils.loader.load_mods.cache_clear()
+        # Trigger re-import
+        ansiblecall.utils.loader.reload()
+
+    def __enter__(self):
+        self.__path = sys.path
+        return self
+
+    def __exit__(self, *exc):
+        sys.path = self.__path

@@ -10,7 +10,7 @@ import shutil
 import yaml
 
 import ansiblecall
-import ansiblecall.utils.ansibleproxy
+import ansiblecall.utils.loader
 
 log = logging.getLogger(__name__)
 
@@ -48,14 +48,22 @@ class Field:
 
     def format_default(self):
         ret = None
-        if self.type is bool and isinstance(self.default, str) and self.default is not None:
+        if (
+            self.type is bool
+            and isinstance(self.default, str)
+            and self.default is not None
+        ):
             if self.default.lower() in ["yes", "true"]:
                 ret = True
             elif self.default.lower() in ["no", "false"]:
                 ret = False
         elif self.type is str and self.default is not None:
             ret = f"{self.default!r}"
-        elif self.type is dict and isinstance(self.default, str) and self.default is not None:
+        elif (
+            self.type is dict
+            and isinstance(self.default, str)
+            and self.default is not None
+        ):
             ret = json.loads(self.default)
         elif (self.type is float or self.type is int) and self.default is not None:
             ret = self.type(self.default)
@@ -63,7 +71,11 @@ class Field:
 
     def __repr__(self):
         default = f"= {self.format_default()}" if self.optional else ""
-        description = " ".join(self.description) if isinstance(self.description, list) else self.description
+        description = (
+            " ".join(self.description)
+            if isinstance(self.description, list)
+            else self.description
+        )
         choices = (self.choices and "Choices: " + str(self.choices)) or ""
         return f'{self.name}: {self.type.__name__} {default}\n"""{description} {choices}"""'
 
@@ -104,7 +116,7 @@ class TypeFactory:
         return cls.align(lines)
 
     def generate(self):
-        mods = ansiblecall.utils.ansibleproxy.load_ansible_mods()
+        mods = ansiblecall.utils.loader.load_mods()
         schema = self.get_io_schema(mod=mods[self.module_name])
         self.input_class_name = self.module_name.split(".")[2].capitalize()
         self.output_class_name = f"{self.input_class_name}Out"
@@ -112,7 +124,9 @@ class TypeFactory:
         self.input_class_body = self.generate_class_body(fields=schema["input"])
         self.module_file_name = f"{self.module_name.replace('.', '_')}.py"
         code = self.render_template()
-        with open(pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w") as fp:
+        with open(
+            pathlib.Path(self.type_dir).joinpath(self.module_file_name), "w"
+        ) as fp:
             fp.write(code)
 
     def render_template(self):
@@ -165,7 +179,9 @@ class {self.input_class_name}(ansiblecall.utils.typefactory.InputBase):
             (
                 n.value.value
                 for n in ast.walk(ast.parse(mod_str))
-                if isinstance(n, ast.Assign) and hasattr(n.targets[0], "id") and n.targets[0].id == var
+                if isinstance(n, ast.Assign)
+                and hasattr(n.targets[0], "id")
+                and n.targets[0].id == var
             ),
             None,
         )
@@ -243,7 +259,9 @@ class {self.input_class_name}(ansiblecall.utils.typefactory.InputBase):
 
     @staticmethod
     def init_dirs(clean=None):
-        init_file = pathlib.Path(__file__).parent.parent.joinpath("typed", "__init__.py")
+        init_file = pathlib.Path(__file__).parent.parent.joinpath(
+            "typed", "__init__.py"
+        )
         init_dir = init_file.parent
         if clean and init_dir.exists():
             log.info("Removing dir %s.", init_dir)

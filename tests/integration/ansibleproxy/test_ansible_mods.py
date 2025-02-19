@@ -7,6 +7,7 @@ import tempfile
 import pytest
 
 import ansiblecall
+import ansiblecall.utils.loader
 
 IS_ROOT = os.getuid() == 0
 
@@ -63,6 +64,6 @@ def test_cache():
     """Check if cache can be created and verify the sum"""
     shutil.rmtree(os.path.expanduser("~/.ansiblecall"))
     hash_sum = ansiblecall.cache(mod_name="ansible.builtin.file")
-    with open(os.path.expanduser("~/.ansiblecall/cache/ansible.modules.file.zip"), "rb") as fp:
+    with open(os.path.expanduser("~/.ansiblecall/cache/ansible.builtin.file.zip"), "rb") as fp:
         expected = hashlib.sha256(fp.read()).hexdigest()
     assert hash_sum == expected

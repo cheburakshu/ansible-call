@@ -1,7 +1,11 @@
 import logging
 import time
 
-import ansiblecall.utils.ansibleproxy
+import ansiblecall.utils.cache
+import ansiblecall.utils.config
+import ansiblecall.utils.ctx
+import ansiblecall.utils.loader
+from ansiblecall.utils.rt import Runtime
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -10,36 +14,12 @@ logging.basicConfig(
 )
 
 
-class Runtime(dict):
-    def __init__(self, *, become=False, become_user=""):
-        super().__init__()
-        self.become = become
-        self.become_user = become_user
-
-    def __getattr__(self, key):
-        return self.get(key)
-
-    def __setattr__(self, key, value):
-        self[key] = value
-
-
-def get_module(mod_name):
-    start = time.time()
-    modules = ansiblecall.utils.ansibleproxy.load_ansible_mods()
-    log.debug(
-        "Loaded %s ansible modules. Elapsed: %0.03fs",
-        len(modules),
-        (time.time() - start),
-    )
-    return modules[mod_name]
-
-
 def module(mod_name, *, rt: Runtime = None, **params):
     """Run ansible module."""
     start = time.time()
     log.debug("Running module [%s] with params [%s]", mod_name, ", ".join(list(params)))
-    mod = get_module(mod_name=mod_name)
-    with ansiblecall.utils.ansibleproxy.Context(module=mod, params=params, runtime=rt) as ctx:
+    mod = ansiblecall.utils.loader.get_module(mod_name=mod_name)
+    with ansiblecall.utils.ctx.Context(module=mod, params=params, runtime=rt) as ctx:
         ret = ctx.run()
         log.debug(
             "Returning data to caller. Total Elapsed: %0.03fs",
@@ -51,13 +31,16 @@ def module(mod_name, *, rt: Runtime = None, **params):
 
 def refresh_modules():
     """Refresh Ansible module cache"""
-    fun = ansiblecall.utils.ansibleproxy.load_ansible_mods
-    fun.cache_clear()
-    return fun()
+    return ansiblecall.utils.cache.refresh_modules()
 
 
 def cache(mod_name):
     """Cache ansible modules and dependencies into a zip file"""
-    mod = get_module(mod_name=mod_name)
-    with ansiblecall.utils.ansibleproxy.Context(module=mod) as ctx:
+    mod = ansiblecall.utils.loader.get_module(mod_name=mod_name)
+    with ansiblecall.utils.ctx.Context(module=mod) as ctx:
         return ctx.cache()
+
+
+def config():
+    """Get configuration parameters"""
+    return ansiblecall.utils.config.get_config()
