@@ -1,8 +1,24 @@
 import os
 import shutil
+from unittest.mock import MagicMock
 
 import ansiblecall
 import ansiblecall.utils.loader
+
+
+def test_salt(monkeypatch):
+    """Mock __salt__ and test two part reference."""
+    has_salt = MagicMock(return_value=True)
+    monkeypatch.setattr(ansiblecall.utils.loader, "has_salt", has_salt)
+    ansiblecall.refresh_modules()
+    has_salt.assert_called()
+    ret = ansiblecall.module("ansible_builtin.ping")
+    assert ret == {"ping": "pong"}
+
+    # Reset mock
+    has_salt = MagicMock(return_value=False)
+    monkeypatch.setattr(ansiblecall.utils.loader, "has_salt", has_salt)
+    ansiblecall.refresh_modules()
 
 
 def test_zip(monkeypatch):

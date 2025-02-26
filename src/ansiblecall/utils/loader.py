@@ -10,6 +10,10 @@ import time
 log = logging.getLogger(__name__)
 
 
+def has_salt():
+    return "__salt__" in globals()
+
+
 def load_module(module_key, module_name, module_path, module_abs):
     # Lazy import
     import ansiblecall
@@ -39,7 +43,9 @@ def load_mods():
             if f.startswith("_") or not f.endswith(".py"):
                 continue
             fname = f.removesuffix(".py")
-            mod = f"ansible.builtin.{fname}"
+            # Ansible modules will be referred in salt as 2 parts ansible_builtin.ping instead of
+            # ansible.builtin.ping.
+            mod = f"ansible_builtin.{fname}" if has_salt() else f"ansible.builtin.{fname}"
             module_name = f"{ansible.modules.__name__}.{fname}"
             module_path = os.path.dirname(os.path.dirname(ansible.__file__))
             ret.update(
@@ -54,27 +60,21 @@ def load_mods():
     # Load collections when available
     # Refer: https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#installing-collections-with-ansible-galaxy
     roots = sys.path
-    roots.append(
-        os.path.expanduser(
-            os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")
-        )
-    )
+    roots.append(os.path.expanduser(os.environ.get("ANSIBLE_COLLECTIONS_PATH", "~/.ansible/collections")))
     for collections_root in roots:
         if str(collections_root).endswith(".zip"):
             continue
         # The glob will produce result like below
         # ['/root/.ansible/collections/ansible_collections/amazon/aws/plugins/modules/cloudtrail_info.py', ...]
-        for f in glob.glob(
-            os.path.join(
-                collections_root, "ansible_collections/*/*/plugins/modules/*.py"
-            )
-        ):
+        for f in glob.glob(os.path.join(collections_root, "ansible_collections/*/*/plugins/modules/*.py")):
             relname = os.path.relpath(f.removesuffix(".py"), collections_root)
             name_parts = relname.split("/")
             namespace, coll_name, module = name_parts[1], name_parts[2], name_parts[-1]
             if module.startswith("_"):
                 continue
-            mod = f"{namespace}.{coll_name}.{module}"
+            # Ansible modules will be referred in salt as 2 parts ansible_builtin.ping instead of
+            # ansible.builtin.ping.
+            mod = f"{namespace}_{coll_name}.{module}" if has_salt() else f"{namespace}.{coll_name}.{module}"
             module_name = relname.replace("/", ".")
             module_path = collections_root
             module_abs = f
@@ -97,8 +97,7 @@ def finder(fun):
     def wrapped(mod_name, *args, **kwargs):
         import ansiblecall.utils.ctx
 
-        with ansiblecall.utils.ctx.ZipContext(mod_name=mod_name) as ctx:
-            ctx.reload()
+        with ansiblecall.utils.ctx.ZipContext(mod_name=mod_name):
             return fun(mod_name, *args, **kwargs)
 
     return wrapped
