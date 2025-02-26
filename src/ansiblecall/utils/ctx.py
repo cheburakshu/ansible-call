@@ -116,10 +116,7 @@ class ZipContext(ContextDecorator):
         if not zipfile.is_zipfile(zip_filename):
             return
         target_dir = pathlib.Path(get_config(key="cache_dir")).joinpath(self.mod_name)
-        if (
-            ansiblecall.utils.cache.compare_checksum(filename=zip_filename) is False
-            or target_dir.exists() is False
-        ):
+        if ansiblecall.utils.cache.compare_checksum(filename=zip_filename) is False or target_dir.exists() is False:
             if target_dir.exists():
                 shutil.rmtree(target_dir)
             pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
@@ -132,6 +129,7 @@ class ZipContext(ContextDecorator):
 
     def __enter__(self):
         self.__path = sys.path
+        self.reload()
         return self
 
     def __exit__(self, *exc):
