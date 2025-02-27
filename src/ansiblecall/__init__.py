@@ -34,11 +34,11 @@ def refresh_modules():
     return ansiblecall.utils.cache.refresh_modules()
 
 
-def cache(mod_name):
+def cache(mod_name, dest=None):
     """Cache ansible modules and dependencies into a zip file"""
     mod = ansiblecall.utils.loader.get_module(mod_name=mod_name)
     with ansiblecall.utils.ctx.Context(module=mod) as ctx:
-        return ctx.cache()
+        return ctx.cache(dest=dest)
 
 
 def config():

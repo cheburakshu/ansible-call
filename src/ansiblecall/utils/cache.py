@@ -143,13 +143,20 @@ def save_checksum(filename: str):
     return checksum
 
 
-def cache(mod_name):
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+def cache(mod_name, dest=None):
+    with tempfile.TemporaryDirectory() as tmp_dir:
         package_libs(path=tmp_dir)
         archive_name = os.path.join(CACHE_DIR, mod_name)
         shutil.make_archive(archive_name, format="zip", root_dir=tmp_dir)
         checksum = save_checksum(filename=archive_name)
-        log.debug("Cached %s module.", mod_name)
+        if dest:
+            for ext in [".zip", ".sha256"]:
+                pathlib.Path(dest).mkdir(parents=True, exist_ok=True)
+                dest_file = pathlib.Path(dest).joinpath(mod_name + ext)
+                if dest_file.exists():
+                    dest_file.unlink(missing_ok=True)
+                shutil.move(src=archive_name + ext, dst=dest)
+        log.debug("Cached %s module at %s.", mod_name, dest or CACHE_DIR)
         return checksum
 
 

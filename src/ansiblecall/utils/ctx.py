@@ -33,8 +33,8 @@ class Context(ContextDecorator):
         self.module = module
         self.runtime = runtime
 
-    def cache(self):
-        return ansiblecall.utils.cache.cache(mod_name=self.module.key)
+    def cache(self, dest=None):
+        return ansiblecall.utils.cache.cache(mod_name=self.module.key, dest=dest)
 
     def run(self):
         try:
