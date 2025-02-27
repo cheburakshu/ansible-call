@@ -67,3 +67,12 @@ def test_cache():
     with open(os.path.expanduser("~/.ansiblecall/cache/ansible.builtin.file.zip"), "rb") as fp:
         expected = hashlib.sha256(fp.read()).hexdigest()
     assert hash_sum == expected
+
+
+def test_cache_dest():
+    """Ensure modules are cacheable to a specified dir"""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        mod_name = "ansible.builtin.ping"
+        ansiblecall.cache(mod_name=mod_name, dest=tmp_dir)
+        for ext in [".zip", ".sha256"]:
+            assert pathlib.Path(tmp_dir).joinpath(mod_name + ext).exists()
