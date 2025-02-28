@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 if not log.hasHandlers():
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=getattr(logging, ansiblecall.utils.config.get_config().log_level.upper()),
         format="%(asctime)s [%(name)-17s][%(levelname)-8s:%(lineno)-4d][%(processName)s:%(process)d] %(message)s",
     )
 
