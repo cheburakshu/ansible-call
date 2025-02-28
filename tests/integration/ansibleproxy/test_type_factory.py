@@ -1,9 +1,12 @@
 import pathlib
 import tempfile
 
+import pytest
+
 from ansiblecall.utils import typefactory
 
 
+@pytest.mark.timeout(10)
 def test_type_factory():
     """Ensure ansible module can be called using typings"""
     typefactory.TypeFactory.run(

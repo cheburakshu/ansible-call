@@ -8,10 +8,12 @@ import ansiblecall.utils.loader
 from ansiblecall.utils.rt import Runtime
 
 log = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(name)-17s][%(levelname)-8s:%(lineno)-4d][%(processName)s:%(process)d] %(message)s",
-)
+
+if not log.hasHandlers():
+    logging.basicConfig(
+        level=getattr(logging, ansiblecall.utils.config.get_config().log_level.upper()),
+        format="%(asctime)s [%(name)-17s][%(levelname)-8s:%(lineno)-4d][%(processName)s:%(process)d] %(message)s",
+    )
 
 
 def module(mod_name, *, rt: Runtime = None, **params):
