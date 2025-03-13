@@ -101,6 +101,8 @@ def package_libs(path):
         joinpath = s.get("joinpath")
         if joinpath:
             src = src.joinpath(joinpath)
+        if not src.is_relative_to(ref[s["relative_to"]]):
+            continue
         dst = pathlib.Path(path).joinpath(src.relative_to(ref[s["relative_to"]]))
         copytree = s["copytree"]
         dirs = dst if copytree else dst.parent
