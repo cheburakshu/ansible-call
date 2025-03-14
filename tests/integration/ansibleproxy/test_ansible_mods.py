@@ -24,6 +24,13 @@ def not_debian():
 NOT_DEBIAN = not_debian()
 
 
+def test_module_fail():
+    """Ensure uncaught exceptions are handled"""
+    ret = ansiblecall.module("ansible.builtin.file", path="/no/thing/here", state="touch")
+    assert ret["failed"] is True
+    assert ret["msg"] == "Error, could not touch target: [Errno 2] No such file or directory: b'/no/thing/here'"
+
+
 def test_ansiblecall_module():
     """Ensure ansible module can be called as an ansiblecall module"""
     assert ansiblecall.module(mod_name="ansible.builtin.ping", data="hello") == {"ping": "hello"}

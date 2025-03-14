@@ -43,6 +43,8 @@ class Context(ContextDecorator):
             else:
                 mod = importlib.import_module(self.module.name)
                 mod.main()
+        except Exception as exc:  # noqa: BLE001
+            return {"failed": True, "msg": exc.results["msg"]}
         except SystemExit:
             return self.ret
 
