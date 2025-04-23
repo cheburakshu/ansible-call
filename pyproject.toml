@@ -41,6 +41,8 @@ version-file = "src/ansiblecall/_version.py"
 [tool.hatch.envs.test]
 dependencies = [
   "pytest",
+  "pytest-timeout",
+  "pytest-retry"
 ]
 
 [tool.hatch.envs.test.scripts]
