@@ -166,3 +166,5 @@ _version.py
 .vagrant/
 Vagrantfile
 src/ansiblecall/typed
+
+*.swp

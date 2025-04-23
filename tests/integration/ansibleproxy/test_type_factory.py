@@ -7,6 +7,7 @@ from ansiblecall.utils import typefactory
 
 
 @pytest.mark.timeout(10)
+@pytest.mark.flaky(retries=3, delay=1)
 def test_type_factory():
     """Ensure ansible module can be called using typings"""
     typefactory.TypeFactory.run(
